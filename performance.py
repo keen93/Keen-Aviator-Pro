@@ -1,10 +1,29 @@
+import os
 import sqlite3
 from datetime import datetime
 
 DATABASE = "aviator.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 
 def get_connection():
+    if DATABASE_URL:
+        import pg8000.dbapi
+
+        url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+
+        return pg8000.dbapi.connect(
+            user=parsed.username,
+            password=parsed.password,
+            host=parsed.hostname,
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip("/")
+        )
+
     connection = sqlite3.connect(DATABASE)
     connection.row_factory = sqlite3.Row
     return connection
@@ -14,6 +33,19 @@ def init_performance_table():
     connection = get_connection()
 
     connection.execute("""
+        CREATE TABLE IF NOT EXISTS signals (
+            id SERIAL PRIMARY KEY,
+            signal TEXT NOT NULL,
+            confidence DOUBLE PRECISION NOT NULL,
+            level TEXT NOT NULL,
+            average DOUBLE PRECISION,
+            volatility DOUBLE PRECISION,
+            rounds INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            outcome TEXT DEFAULT 'PENDING',
+            outcome_multiplier DOUBLE PRECISION
+        )
+    """ if DATABASE_URL else """
         CREATE TABLE IF NOT EXISTS signals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             signal TEXT NOT NULL,
@@ -45,6 +77,17 @@ def save_signal(result):
             rounds,
             created_at
         )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """ if DATABASE_URL else """
+        INSERT INTO signals (
+            signal,
+            confidence,
+            level,
+            average,
+            volatility,
+            rounds,
+            created_at
+        )
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
         result.get("signal", "WAIT"),
@@ -58,6 +101,7 @@ def save_signal(result):
 
     connection.commit()
     connection.close()
+
 
 def record_outcome(signal_id, outcome, multiplier):
     outcome = str(outcome).upper().strip()
@@ -73,6 +117,10 @@ def record_outcome(signal_id, outcome, multiplier):
 
     cursor = connection.execute("""
         UPDATE signals
+        SET outcome = %s, outcome_multiplier = %s
+        WHERE id = %s AND outcome = 'PENDING'
+    """ if DATABASE_URL else """
+        UPDATE signals
         SET outcome = ?, outcome_multiplier = ?
         WHERE id = ? AND outcome = 'PENDING'
     """, (
@@ -86,6 +134,8 @@ def record_outcome(signal_id, outcome, multiplier):
     connection.close()
 
     return updated
+
+
 def get_signal_count():
     connection = get_connection()
 
@@ -95,7 +145,7 @@ def get_signal_count():
 
     connection.close()
 
-    return row["count"]
+    return int(row[0] if DATABASE_URL else row["count"])
 
 
 def get_signal_history(limit=50):
@@ -115,9 +165,43 @@ def get_signal_history(limit=50):
             outcome_multiplier
         FROM signals
         ORDER BY id DESC
+        LIMIT %s
+    """ if DATABASE_URL else """
+        SELECT
+            id,
+            signal,
+            confidence,
+            level,
+            average,
+            volatility,
+            rounds,
+            created_at,
+            outcome,
+            outcome_multiplier
+        FROM signals
+        ORDER BY id DESC
         LIMIT ?
     """, (limit,)).fetchall()
 
     connection.close()
+
+    if DATABASE_URL:
+        columns = [
+            "id",
+            "signal",
+            "confidence",
+            "level",
+            "average",
+            "volatility",
+            "rounds",
+            "created_at",
+            "outcome",
+            "outcome_multiplier"
+        ]
+
+        return [
+            dict(zip(columns, row))
+            for row in rows
+        ]
 
     return [dict(row) for row in rows]
