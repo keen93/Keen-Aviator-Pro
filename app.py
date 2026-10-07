@@ -1,6 +1,8 @@
 
 
 from flask import Flask, render_template, jsonify, request
+import os
+from functools import wraps
 from datetime import datetime
 
 from engine import engine
@@ -16,6 +18,31 @@ from database import (
 )
 
 app = Flask(__name__)
+
+ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
+
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not ADMIN_API_KEY:
+            return jsonify({
+                "success": False,
+                "error": "Server API key is not configured"
+            }), 500
+
+        supplied_key = request.headers.get("X-API-Key")
+
+        if supplied_key != ADMIN_API_KEY:
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized"
+            }), 401
+
+        return f(*args, **kwargs)
+
+    return decorated
+
 
 init_database()
 init_performance_table()
@@ -41,6 +68,7 @@ def status():
 
 
 @app.route("/api/round", methods=["POST"])
+@require_api_key
 def add_new_round():
     try:
         data = request.get_json(silent=True) or {}
@@ -89,6 +117,7 @@ def signal():
     return jsonify(result)
 
 @app.route("/api/record-signal", methods=["POST"])
+@require_api_key
 def record_signal():
     result = engine.analyze()
 
@@ -105,6 +134,7 @@ def record_signal():
         "signal": result
     })
 @app.route("/api/record-outcome", methods=["POST"])
+@require_api_key
 def record_outcome():
     try:
         data = request.get_json(silent=True) or {}
@@ -162,6 +192,7 @@ def history():
 
 
 @app.route("/api/reset", methods=["POST"])
+@require_api_key
 def reset():
     reset_rounds()
     engine.history.clear()
