@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Keen Aviator Pro</title>
+
+<style>
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+}
+
+body{
+    font-family:Arial,sans-serif;
+    background:#07111f;
+    color:#fff;
+    min-height:100vh;
+}
+
+.container{
+    width:100%;
+    max-width:520px;
+    margin:auto;
+    padding:18px;
+}
+
+.header{
+    text-align:center;
+    padding:20px 0;
+}
+
+.header h1{
+    font-size:27px;
+    letter-spacing:2px;
+}
+
+.header p{
+    color:#8ea4bd;
+    margin-top:7px;
+}
+
+.card{
+    background:#0d1b2d;
+    border:1px solid #1b3552;
+    border-radius:18px;
+    padding:20px;
+    margin-bottom:15px;
+}
+
+.label{
+    color:#8ea4bd;
+    font-size:12px;
+    letter-spacing:1.5px;
+    margin-bottom:12px;
+}
+
+.signal{
+    text-align:center;
+    font-size:34px;
+    font-weight:bold;
+    margin:12px 0;
+}
+
+.confidence{
+    text-align:center;
+    font-size:21px;
+    margin-bottom:8px;
+}
+
+.level{
+    text-align:center;
+    color:#f5c542;
+    font-weight:bold;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+.stat{
+    background:#091525;
+    border-radius:12px;
+    padding:14px;
+}
+
+.stat span{
+    display:block;
+    color:#8096ad;
+    font-size:11px;
+    margin-bottom:6px;
+}
+
+.stat strong{
+    font-size:19px;
+}
+
+.status{
+    display:flex;
+    justify-content:space-between;
+    padding:8px 0;
+    color:#a9bad0;
+}
+
+.online{
+    color:#48e08a;
+    font-weight:bold;
+}
+
+button{
+    width:100%;
+    border:0;
+    border-radius:13px;
+    padding:15px;
+    background:#1769e0;
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+button:active{
+    transform:scale(.98);
+}
+
+.notice{
+    color:#8398ae;
+    font-size:11px;
+    line-height:1.5;
+    text-align:center;
+}
+
+@media(max-width:360px){
+    .signal{
+        font-size:28px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1>KEEN AVIATOR PRO</h1>
+        <p>Intelligent Signal Dashboard</p>
+    </div>
+
+    <div class="card">
+
+        <div class="label">CURRENT ANALYSIS</div>
+
+        <div id="signal" class="signal">WAIT</div>
+
+        <div id="confidence" class="confidence">
+            0% Confidence
+        </div>
+
+        <div id="level" class="level">
+            INSUFFICIENT DATA
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="label">ENGINE STATISTICS</div>
+
+        <div class="grid">
+
+            <div class="stat">
+                <span>ROUNDS</span>
+                <strong id="rounds">0</strong>
+            </div>
+
+            <div class="stat">
+                <span>AVERAGE</span>
+                <strong id="average">--</strong>
+            </div>
+
+            <div class="stat">
+                <span>LOW ROUNDS</span>
+                <strong id="lowRounds">0</strong>
+            </div>
+
+            <div class="stat">
+                <span>HIGH ROUNDS</span>
+                <strong id="highRounds">0</strong>
+            </div>
+
+            <div class="stat">
+                <span>VOLATILITY</span>
+                <strong id="volatility">--</strong>
+            </div>
+
+            <div class="stat">
+                <span>SERVER</span>
+                <strong id="time">--</strong>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="label">SYSTEM</div>
+
+        <div class="status">
+            <span>Status</span>
+            <strong id="status" class="online">ONLINE</strong>
+        </div>
+
+        <div class="status">
+            <span>Engine</span>
+            <strong>Keen AI</strong>
+        </div>
+
+        <div class="status">
+            <span>Mode</span>
+            <strong>ANALYSIS</strong>
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <button onclick="runAnalysis()">
+            RUN ANALYSIS
+        </button>
+    </div>
+
+    <div class="section">
+        <div class="label">ADD ROUND</div>
+        <div class="panel">
+            <input id="multiplierInput" type="number" step="0.01" min="0.01" placeholder="Enter multiplier e.g. 1.25">
+            <button onclick="addRound()">ADD ROUND</button>
+            <div id="message"></div>
+        </div>
+    </div>
+
+    <div class="card notice">
+        Experimental analytical system. Signal confidence is a statistical
+        score and does not guarantee future Aviator outcomes.
+    </div>
+
+</div>
+
+<script>
+
+async function loadHistory(){
+    try{
+        const response=await fetch("/api/history");
+        const data=await response.json();
+        let box=document.getElementById("history");
+        if(!box){
+            const section=document.createElement("div");
+            section.className="section";
+            section.innerHTML=`<div class="label">RECENT ROUND HISTORY</div><div class="panel"><div id="history"></div></div>`;
+            document.querySelector(".footer").before(section);
+            box=document.getElementById("history");
+        }
+        box.innerHTML=(data.rounds||[]).slice().reverse().map(x=>`<span style="display:inline-block;margin:4px;padding:8px 12px;border-radius:8px;background:#171e2a;border:1px solid #293346;font-weight:bold">${Number(x).toFixed(2)}x</span>`).join("") || "No rounds saved.";
+    }catch(error){
+        const box=document.getElementById("history");
+        if(box) box.textContent="Unable to load history.";
+    }
+}
+
+async function addRound(){
+    const input=document.getElementById("multiplierInput");
+    const message=document.getElementById("message");
+    const value=parseFloat(input.value);
+    if(!value || value<=0){
+        message.textContent="Enter a valid multiplier greater than 0.";
+        return;
+    }
+    try{
+        const response=await fetch("/api/round",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({multiplier:value})
+        });
+        const data=await response.json();
+        if(!data.success){
+            message.textContent=data.error || "Unable to save round.";
+            return;
+        }
+        message.textContent=`Round ${value.toFixed(2)}x saved successfully.`;
+        input.value="";
+        runAnalysis();\nloadHistory();
+        loadHistory();
+    }catch(error){
+        message.textContent="Unable to connect to server.";
+    }
+}
+
+async function runAnalysis(){
+
+    try{
+
+        const response =
+            await fetch("/api/signal");
+
+        if(!response.ok){
+            throw new Error("Server error");
+        }
+
+        const data =
+            await response.json();
+
+        document.getElementById("signal")
+            .textContent = data.signal;
+
+        document.getElementById("confidence")
+            .textContent =
+            data.confidence + "% Confidence";
+
+        document.getElementById("level")
+            .textContent = data.level;
+
+        document.getElementById("rounds")
+            .textContent = data.rounds;
+
+        document.getElementById("average")
+            .textContent =
+            data.average !== undefined
+            ? data.average + "x"
+            : "--";
+
+        document.getElementById("lowRounds")
+            .textContent =
+            data.low_rounds ?? 0;
+
+        document.getElementById("highRounds")
+            .textContent =
+            data.high_rounds ?? 0;
+
+        document.getElementById("volatility")
+            .textContent =
+            data.volatility !== undefined
+            ? data.volatility
+            : "--";
+
+        document.getElementById("time")
+            .textContent =
+            data.time || "--";
+
+    }catch(error){
+
+        document.getElementById("status")
+            .textContent = "OFFLINE";
+
+        document.getElementById("status")
+            .className = "";
+
+        console.error(error);
+    }
+}
+
+
+async function loadHistory(){
+    try{
+        const response=await fetch("/api/history");
+        const data=await response.json();
+        let box=document.getElementById("history");
+        if(!box){
+            box=document.createElement("div");
+            box.id="history";
+            box.style.cssText="margin-top:15px;padding:12px;background:#111824;border:1px solid #263043;border-radius:12px;line-height:2;";
+            const section=document.createElement("div");
+            section.className="section";
+            section.innerHTML="<div class=\"label\">RECENT ROUND HISTORY</div>";
+            section.appendChild(box);
+            document.querySelector(".footer").before(section);
+        }
+        box.innerHTML=(data.rounds||[]).slice().reverse().map(x=>`<span style="display:inline-block;margin:3px;padding:6px 10px;border-radius:7px;background:#171e2a;border:1px solid #293346">${Number(x).toFixed(2)}x</span>`).join("") || "No rounds saved.";
+    }catch(error){ console.error(error); }
+}
+
+async function updateStatus(){
+
+    try{
+
+        const response =
+            await fetch("/api/status");
+
+        const data =
+            await response.json();
+
+        document.getElementById("status")
+            .textContent = "ONLINE";
+
+        document.getElementById("status")
+            .className = "online";
+
+        document.getElementById("time")
+            .textContent = data.time;
+
+    }catch(error){
+
+        document.getElementById("status")
+            .textContent = "OFFLINE";
+
+    }
+}
+
+
+runAnalysis();
+loadHistory();
+
+updateStatus();
+
+setInterval(runAnalysis, 10000);
+
+setInterval(updateStatus, 5000);
+setInterval(loadHistory, 10000);
+
+</script>
+
+</body>
+</html>
