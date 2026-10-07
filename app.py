@@ -11,6 +11,7 @@ from database import (
     add_round,
     get_recent_rounds,
     get_round_count,
+    reset_rounds,
     get_connection
 )
 
@@ -162,11 +163,7 @@ def history():
 
 @app.route("/api/reset", methods=["POST"])
 def reset():
-    connection = get_connection()
-    connection.execute("DELETE FROM rounds")
-    connection.commit()
-    connection.close()
-
+    reset_rounds()
     engine.history.clear()
 
     return jsonify({

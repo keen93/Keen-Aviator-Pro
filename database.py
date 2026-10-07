@@ -158,3 +158,16 @@ def get_round_count():
     connection.close()
 
     return int(count)
+
+def reset_rounds():
+    connection = get_connection()
+
+    if DATABASE_URL:
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM rounds")
+        cursor.close()
+    else:
+        connection.execute("DELETE FROM rounds")
+
+    connection.commit()
+    connection.close()
